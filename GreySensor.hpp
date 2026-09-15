@@ -3,43 +3,19 @@
 // clang-format off
 /* === MODULE MANIFEST V2 ===
 module_description: XRobot Module for digital grey sensors
-constructor_args:
-  - channel_names:
-      - "grey_sensor_gpio_0"
-      - "grey_sensor_gpio_1"
-      - "grey_sensor_gpio_2"
-      - "grey_sensor_gpio_3"
-      - "grey_sensor_gpio_4"
-      - "grey_sensor_gpio_5"
-      - "grey_sensor_gpio_6"
-      - "grey_sensor_gpio_7"
-  - active_low: false
-  - topic_name: "grey_sensor"
-  - publish_period_ms: 10
-template_args: []
-required_hardware:
-  - grey_sensor_gpio_0
-  - grey_sensor_gpio_1
-  - grey_sensor_gpio_2
-  - grey_sensor_gpio_3
-  - grey_sensor_gpio_4
-  - grey_sensor_gpio_5
-  - grey_sensor_gpio_6
-  - grey_sensor_gpio_7
 depends: []
 === END MANIFEST === */
 // clang-format on
-
-#include "app_framework.hpp"
-#include "gpio.hpp"
-#include "message.hpp"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
 
-class GreySensor : public LibXR::Application
+#include "gpio.hpp"
+#include "message.hpp"
+
+class GreySensor
 {
  public:
   static constexpr size_t MAX_CHANNEL_COUNT = 8;
@@ -67,10 +43,8 @@ class GreySensor : public LibXR::Application
     std::array<uint8_t, MAX_CHANNEL_COUNT> active = {};
   };
 
-  GreySensor(LibXR::HardwareContainer& hw, LibXR::ApplicationManager& app,
-             std::initializer_list<const char*> channel_names,
-             bool active_low = false, const char* topic_name = "grey_sensor",
-             uint32_t publish_period_ms = 10);
+  GreySensor(std::initializer_list<LibXR::GPIO*> channels, bool active_low = false,
+             const char* topic_name = "grey_sensor", uint32_t publish_period_ms = 10);
 
   Sample Read();
 
@@ -82,7 +56,7 @@ class GreySensor : public LibXR::Application
 
   size_t ChannelCount() const;
 
-  void OnMonitor() override;
+  void OnMonitor();
 
  private:
   static uint8_t BuildBit(size_t channel);
