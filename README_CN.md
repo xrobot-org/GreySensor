@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Language](https://img.shields.io/badge/language-C++20-orange.svg)](https://en.cppreference.com/)
-[![Framework](https://img.shields.io/badge/Framework-LibXR-green)](https://github.com/Jiu-xiao/libxr)
+[![Framework](https://img.shields.io/badge/Framework-LibXR-green)](https://github.com/xrobot-org/libxr)
 [![GitHub stars](https://img.shields.io/github/stars/verdancy-org/GreySensor?style=social)](https://github.com/verdancy-org/GreySensor/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/verdancy-org/GreySensor?style=social)](https://github.com/verdancy-org/GreySensor/network/members)
 [![GitHub issues](https://img.shields.io/github/issues/verdancy-org/GreySensor)](https://github.com/verdancy-org/GreySensor/issues)
