@@ -1,80 +1,125 @@
 # GreySensor
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Language](https://img.shields.io/badge/language-C++20-orange.svg)](https://en.cppreference.com/)
-[![Framework](https://img.shields.io/badge/Framework-LibXR-green)](https://github.com/xrobot-org/libxr)
-[![GitHub stars](https://img.shields.io/github/stars/verdancy-org/GreySensor?style=social)](https://github.com/verdancy-org/GreySensor/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/verdancy-org/GreySensor?style=social)](https://github.com/verdancy-org/GreySensor/network/members)
-[![GitHub issues](https://img.shields.io/github/issues/verdancy-org/GreySensor)](https://github.com/verdancy-org/GreySensor/issues)
+[English](README.md)
 
-**GreySensor** 是一个面向循迹和反射式光电阵列的可运行时配置数字灰度传感器模块。
+面向循迹和反射式光电阵列的数字灰度传感器模块。
 
-## 模块介绍
+模块按传入顺序（从左到右）读取 1-8 路数字 GPIO 通道，把结果整理成紧凑的循迹样本，并通过
+LibXR Topic 发布。模块不绑定板级引脚命名：BSP 注册 GPIO 对象，实例配置中列出它们。
 
-GreySensor 按应用层传入的顺序读取数字 GPIO 通道，并通过 LibXR `Topic` 发布紧凑的循迹状态。模块不绑定具体板级引脚命名：板级或应用层负责注册 GPIO 硬件别名，再把这些别名字符串传给模块构造函数。
+## 行为
 
-模块会根据有效通道计算加权线位置，并在短暂丢线时保留最近一次有效位置，方便上层控制环获得稳定的方向反馈。
+- 构造函数断言通道数为 1-8 且指针非空，并把每个 GPIO 配置为无上下拉输入。
+- 通道读到高电平即为有效；`active_low` 为 true 时低电平有效。
+- `n` 路中第 `i` 路的位置刻度为 `(2i - (n - 1)) * 1000 / 2`：左侧为负，右侧为正，中心为 0。
+  8 路阵列为 `-3500, -2500, -1500, -500, 500, 1500, 2500, 3500`。
+- `weighted_position` 是有效通道位置的平均值。只要有通道有效，`position` 就等于它，并被记忆。
+- 没有通道有效时 `line_lost` 置位，`position` 保持最近一次记忆的位置（没有记忆时为 0），
+  `lost_side` 表示线最后出现在哪一侧，`lost_count` 统计连续丢线的读取次数。
+- `OnMonitor()` 最多每 `publish_period_ms` 毫秒发布一次样本（为 0 时每次 monitor 调用都发布），
+  因此实际发布频率同时受 monitor 循环周期限制。
 
-## 功能特性
+## Topic
 
-- 基于 `LibXR::GPIO` 硬件抽象接口，模块与具体平台 GPIO 实现解耦。
-
-- 遵循 `Application` 框架规范，支持依赖注入，并通过 MANIFEST 接入自动化生命周期管理。
-
-- 支持从 `channel_names` initializer list 自动推导通道数量。当前位图载荷支持 1-8 路通道。
-
-- 发布原始通道状态、有效通道状态、加权位置、丢线状态、记忆位置和连续丢线计数。
-
-- 使用有符号定点位置刻度：左侧为负，右侧为正，中心为 0。
-
-## 硬件需求
-
-- 需要提供与 `channel_names` 配置中每个字符串匹配的 GPIO 设备节点。
-
-## 构造参数
-
-- `channel_names`
-  - 从左到右排列的 GPIO 别名列表。列表长度决定实际启用的通道数量。
-
-- `active_low`
-  - 是否使用低电平表示对应通道检测到线。
-
-- `topic_name`
-  - 用于发布 `GreySensor::Sample` 的 Topic 名称。
-
-- `publish_period_ms`
-  - 最小发布间隔，单位为毫秒。设置为 `0` 时在每次 monitor 周期都发布。
-
-### API 参考
+| Topic | 类型 |
+| --- | --- |
+| `topic_name`（默认 `grey_sensor`） | `GreySensor::Sample` |
 
 ```cpp
 struct Sample {
-    uint8_t raw_mask;
-    uint8_t active_mask;
-    uint8_t changed_mask;
-    uint8_t channel_count;
-    uint8_t active_count;
-    uint8_t line_detected;
-    uint8_t line_lost;
-    uint8_t lost_side;
-    int16_t weighted_position;
-    int16_t position;
-    int16_t remembered_position;
-    uint32_t lost_count;
-    uint32_t sequence;
-    std::array<uint8_t, MAX_CHANNEL_COUNT> raw;
-    std::array<uint8_t, MAX_CHANNEL_COUNT> active;
+  uint8_t raw_mask;             // 第 i 位 = 第 i 路读到高电平
+  uint8_t active_mask;          // 第 i 位 = 第 i 路有效
+  uint8_t changed_mask;         // active_mask 与上一次发布值的异或
+  uint8_t channel_count;
+  uint8_t active_count;
+  uint8_t line_detected;        // 有任一通道有效时为 1
+  uint8_t line_lost;            // 没有通道有效时为 1
+  uint8_t lost_side;            // 0 未知，1 左侧，2 右侧（仅丢线时）
+  int16_t weighted_position;    // 有效通道位置的平均值
+  int16_t position;             // weighted_position，丢线时为记忆位置
+  int16_t remembered_position;  // 最近一次检测到线时的位置
+  uint32_t lost_count;          // 连续丢线读取次数（仅丢线时）
+  uint32_t sequence;            // 每次发布加 1
+  std::array<uint8_t, MAX_CHANNEL_COUNT> raw;
+  std::array<uint8_t, MAX_CHANNEL_COUNT> active;
 };
 ```
 
-对于 8 路阵列，默认位置刻度映射为：
+## 公共接口
 
-```text
--3500, -2500, -1500, -500, 500, 1500, 2500, 3500
-```
+- `Sample Read()`：读取所有通道并更新位置状态（不发布；`changed_mask` 和 `sequence` 为 0）。
+- `uint8_t ReadRawMask() const`、`uint8_t ReadActiveMask() const`：只读取掩码。
+- `int16_t ReadPosition()`：`Read().position`。
+- `size_t ChannelCount() const`。
 
-当没有通道有效时，`line_lost` 置位，`position` 保持最近一次有效 `weighted_position`。`lost_side` 为 `0` 表示未知，`1` 表示左侧，`2` 表示右侧。
+`Read()` 和 `ReadPosition()` 与发布的样本共用位置记忆和丢线计数。
 
 ## 依赖
 
-- 除 LibXR 基础框架外无额外依赖。
+无其他模块依赖，仅使用 LibXR。
+
+## 构造接口
+
+```cpp
+GreySensor(std::initializer_list<LibXR::GPIO*> channels, bool active_low = false,
+           const char* topic_name = "grey_sensor", uint32_t publish_period_ms = 10);
+```
+
+依赖：
+
+- `channels`：从左到右排列的 `LibXR::GPIO` 输入指针；列表长度（1-8）决定通道数。
+
+配置：
+
+- `active_low`：低电平表示检测到线，默认 `false`。
+- `topic_name`：发布的 Topic 名称，默认 `"grey_sensor"`。
+- `publish_period_ms`：最小发布间隔，单位 ms，默认 10；为 0 时每次 monitor 调用都发布。
+
+## 使用
+
+```sh
+xrobot module add xrobot-org/GreySensor
+xrobot setup
+xrobot instance add xrobot-org/GreySensor
+```
+
+`xrobot instance add` 在 `User/xrobot.yaml` 中写入一个实例，依赖项留空，默认值按源码写出；
+把 `channels` 填为 BSP 中用 `XR_REGISTER` 注册的 GPIO 对象的地址，每路一项、从左到右
+（参数类型为 `LibXR::GPIO*`，所以要写带引号的 `&`）：
+
+```yaml
+modules:
+  - module: xrobot-org/GreySensor
+    id: greysensor_0
+    args:
+      - channels:
+          - '&grey_0'
+          - '&grey_1'
+          - '&grey_2'
+          - '&grey_3'
+          - '&grey_4'
+          - '&grey_5'
+          - '&grey_6'
+          - '&grey_7'
+      - active_low: 'false'
+      - topic_name: '"grey_sensor"'
+      - publish_period_ms: '10'
+```
+
+BSP 侧：
+
+```cpp
+XR_REGISTER(grey_0, LibXR::GPIO);
+XR_REGISTER(grey_1, LibXR::GPIO);
+XR_REGISTER(grey_2, LibXR::GPIO);
+XR_REGISTER(grey_3, LibXR::GPIO);
+XR_REGISTER(grey_4, LibXR::GPIO);
+XR_REGISTER(grey_5, LibXR::GPIO);
+XR_REGISTER(grey_6, LibXR::GPIO);
+XR_REGISTER(grey_7, LibXR::GPIO);
+```
+
+填好后再次运行 `xrobot setup`，生成 `User/xrobot_main.hpp`。
+
+`xrobot module show .`（在本仓库中）或 `xrobot module show Modules/xrobot-org/GreySensor`
+（在 BSP 中）打印 manifest 和当前的构造函数。
