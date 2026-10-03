@@ -2,7 +2,7 @@
 
 // clang-format off
 /* === MODULE MANIFEST V2 ===
-module_description: XRobot Module for digital grey sensors
+module_description: 数字灰度（反射式循迹）传感器阵列模块 / Module for digital grey (reflective line-tracking) sensor arrays
 depends: []
 === END MANIFEST === */
 // clang-format on
