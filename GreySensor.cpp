@@ -45,8 +45,8 @@ GreySensor::GreySensor(std::initializer_list<LibXR::GPIO*> channels, bool active
   {
     ASSERT(channel != nullptr);
     channels_[i] = channel;
-    const LibXR::ErrorCode err =
-        channels_[i]->SetConfig({LibXR::GPIO::Direction::INPUT, LibXR::GPIO::Pull::NONE});
+    const LibXR::ErrorCode err = channels_[i]->SetConfig(
+        {.direction = LibXR::GPIO::Direction::INPUT, .pull = LibXR::GPIO::Pull::NONE});
     ASSERT(err == LibXR::ErrorCode::OK);
     i++;
   }
