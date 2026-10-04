@@ -6,7 +6,7 @@
 
 构造时，GreySensor 要求通道数为 1 到 8（不满足时进入 LibXR 的致命错误处理，debug 与 release 构建相同），断言指针非空，并把每个 GPIO 配置为无上下拉的输入。模块按传入顺序（从左到右）读取这些数字 GPIO 通道，把结果整理成紧凑的循迹样本，并通过 LibXR Topic 发布。模块使用的 GPIO 对象由 BSP 注册，实例配置中按顺序列出。
 
-通道读到高电平即为有效；`active_low` 为 `true` 时读到低电平为有效。`OnMonitor()` 最多每 `publish_period_ms` 毫秒发布一次样本，为 0 时每次 monitor 调用都发布，因此实际发布频率同时受 monitor 循环周期限制。
+通道读到高电平即为有效；`active_low` 为 `true` 时读到低电平为有效。`OnMonitor()` 最多每 `publish_period_ms` 毫秒发布一次样本，为 0 时每次 monitor 调用都发布，因此实际发布频率同时受 monitor 循环周期限制。monitor 循环周期由配置中的 `settings.monitor_sleep_ms` 设定，默认 1000 ms。
 
 模块提供以下公共方法：
 
@@ -19,7 +19,7 @@
 
 Upon construction, GreySensor requires 1 to 8 channels (otherwise it enters the LibXR fatal error handler, the same in debug and release builds), asserts that they are non-null and configures each GPIO as an input without pull. The Module reads these digital GPIO channels in the order they are passed (left to right), turns the result into a compact line-tracking sample and publishes it through a LibXR Topic. The GPIO objects used by the Module are registered by the BSP and listed in order in the instance configuration.
 
-A channel is active when it reads high, or when it reads low if `active_low` is `true`. `OnMonitor()` publishes a sample at most every `publish_period_ms` ms, and on every monitor call when it is 0, so the actual publish rate is also bounded by the monitor loop period.
+A channel is active when it reads high, or when it reads low if `active_low` is `true`. `OnMonitor()` publishes a sample at most every `publish_period_ms` ms, and on every monitor call when it is 0, so the actual publish rate is also bounded by the monitor loop period. The monitor loop period is set by `settings.monitor_sleep_ms` in the configuration, 1000 ms by default.
 
 The Module provides the following public methods:
 
