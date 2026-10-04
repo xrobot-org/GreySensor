@@ -37,8 +37,8 @@ GreySensor::GreySensor(std::initializer_list<LibXR::GPIO*> channels, bool active
       active_low_(active_low),
       publish_period_ms_(publish_period_ms)
 {
-  ASSERT(channel_count_ > 0);
-  ASSERT(channel_count_ <= MAX_CHANNEL_COUNT);
+  REQUIRE(channel_count_ > 0);
+  REQUIRE(channel_count_ <= MAX_CHANNEL_COUNT);
 
   size_t i = 0;
   for (LibXR::GPIO* channel : channels)
