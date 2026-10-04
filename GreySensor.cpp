@@ -30,31 +30,28 @@ uint8_t GreySensor::GetLostSide(int16_t position)
   return LOST_SIDE_UNKNOWN;
 }
 
-GreySensor::GreySensor(LibXR::HardwareContainer& hw, LibXR::ApplicationManager& app,
-                       std::initializer_list<const char*> channel_names,
-                       bool active_low, const char* topic_name,
-                       uint32_t publish_period_ms)
-    : channel_count_(channel_names.size()),
+GreySensor::GreySensor(std::initializer_list<LibXR::GPIO*> channels, bool active_low,
+                       const char* topic_name, uint32_t publish_period_ms)
+    : channel_count_(channels.size()),
       topic_(LibXR::Topic::CreateTopic<Sample>(topic_name)),
       active_low_(active_low),
       publish_period_ms_(publish_period_ms)
 {
-  ASSERT(channel_count_ > 0);
-  ASSERT(channel_count_ <= MAX_CHANNEL_COUNT);
+  REQUIRE(channel_count_ > 0);
+  REQUIRE(channel_count_ <= MAX_CHANNEL_COUNT);
 
   size_t i = 0;
-  for (const char* name : channel_names)
+  for (LibXR::GPIO* channel : channels)
   {
-    ASSERT(name != nullptr);
-    channels_[i] = hw.FindOrExit<LibXR::GPIO>({name});
+    ASSERT(channel != nullptr);
+    channels_[i] = channel;
     const LibXR::ErrorCode err = channels_[i]->SetConfig(
-        {LibXR::GPIO::Direction::INPUT, LibXR::GPIO::Pull::NONE});
+        {.direction = LibXR::GPIO::Direction::INPUT, .pull = LibXR::GPIO::Pull::NONE});
     ASSERT(err == LibXR::ErrorCode::OK);
     i++;
   }
 
   last_active_mask_ = ReadActiveMask();
-  app.Register(*this);
 }
 
 GreySensor::Sample GreySensor::ReadDigital() const
@@ -101,8 +98,7 @@ void GreySensor::UpdatePositionState(Sample& sample)
   {
     sample.line_detected = 1;
     sample.line_lost = 0;
-    sample.weighted_position =
-        static_cast<int16_t>(weighted_sum / sample.active_count);
+    sample.weighted_position = static_cast<int16_t>(weighted_sum / sample.active_count);
     sample.position = sample.weighted_position;
 
     remembered_position_ = sample.position;
@@ -158,4 +154,3 @@ void GreySensor::OnMonitor()
 
   topic_.Publish(sample);
 }
-
